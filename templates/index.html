@@ -379,7 +379,7 @@
             <div class="card">
                 <h3>5 · Integrar Lovable</h3>
                 <label>URL do Webhook/Endpoint Lovable</label>
-                <input type="text" id="inp-lovable-url" placeholder="https://seu-app-lovable.com/api/webhook" style="margin-bottom: 10px;">
+                <input type="text" id="inp-lovable-url" value="https://rysqnnvljodljdoiahrw.supabase.co/functions/v1/receive-inventory" placeholder="https://seu-app-lovable.com/api/webhook" style="margin-bottom: 10px;">
                 <button class="btn btn-primary" onclick="enviarParaLovable()" id="btn-enviar-lovable" style="background: linear-gradient(135deg, #7b61ff, #00d4ff); display: none;">
                     📤 Enviar JSON
                 </button>
@@ -899,7 +899,9 @@
                 const response = await fetch(url, {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer projefarma",
+                        "apikey": "projefarma"
                     },
                     body: JSON.stringify(payload)
                 });
