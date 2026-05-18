@@ -4,8 +4,7 @@
 import json
 import base64
 import io
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# pytesseract removed as local OCR is disabled in favor of OpenAI Vision for 100% precision on Render
 from collections import Counter
 from typing import Dict, List, Optional
 from PIL import Image, ImageEnhance
