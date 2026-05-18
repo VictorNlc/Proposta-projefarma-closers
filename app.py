@@ -30,12 +30,8 @@ app.config['DEBUG_FOLDER'] = 'debug'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DEBUG_FOLDER'], exist_ok=True)
 
-# Inicializa analisador
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("OPENAI_API_KEY não configurada no .env")
-
-analyzer = PrecisionAnalyzer(api_key)
+# Inicializa analisador de forma preguiçosa (lazy) no endpoint para não quebrar o boot do Render
+analyzer = None
 
 # ============================================================================
 # ROTAS
@@ -83,6 +79,12 @@ def renderizar_pdf():
 @app.route("/api/analisar", methods=["POST"])
 def analisar():
     """Analisa recortes com 100% de precisão."""
+    global analyzer
+    if not analyzer:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return jsonify({"erro": "A chave OPENAI_API_KEY não está configurada no servidor. Por favor, adicione-a nas variáveis de ambiente do Render."}), 500
+        analyzer = PrecisionAnalyzer(api_key)
     pdf_file = request.files.get("pdf")
     pagina = int(request.form.get("pagina", 1))
     recortes_json = request.form.get("recortes", "[]")
