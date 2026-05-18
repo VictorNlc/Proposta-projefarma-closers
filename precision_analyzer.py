@@ -8,8 +8,7 @@ import io
 from collections import Counter
 from typing import Dict, List, Optional
 from PIL import Image, ImageEnhance
-import cv2
-import numpy as np
+# opencv and numpy removed as local OCR preprocessing is disabled in favor of raw OpenAI Vision
 from openai import OpenAI
 from catalog import find_catalog_item, get_all_official_names
 
@@ -39,30 +38,11 @@ class PrecisionAnalyzer:
         img.save(buffered, format="JPEG", quality=90)
         return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    def _preprocess_image(self, pil_img: Image.Image) -> Image.Image:
-        """Apply denoise, contrast boost and adaptive binarization for better OCR/AI."""
-        # Convert to OpenCV BGR format
-        img_np = np.array(pil_img.convert("RGB"))
-        img_cv = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-        # Denoise
-        img_cv = cv2.fastNlMeansDenoisingColored(img_cv, None, 10, 10, 7, 21)
-        # Convert back to PIL for contrast enhancement
-        img_pil = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
-        enhancer = ImageEnhance.Contrast(img_pil)
-        img_pil = enhancer.enhance(1.5)
-        # Adaptive threshold (binary)
-        gray = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2GRAY)
-        thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                       cv2.THRESH_BINARY, 31, 10)
-        return Image.fromarray(thresh)
-
     def analyze_image(self, image_pil: Image.Image) -> List[Dict]:
         """Analyze a cropped image using OCR and OpenAI with preprocessing and confidence filter."""
         self.last_raw_ai_data = None
         results: List[Dict] = []
         official_list = get_all_official_names()
-        # Preprocess image for better OCR/AI
-        proc_img = self._preprocess_image(image_pil)
         # -------------------------------------------------
         # 1. OCR LOCAL (Tesseract) with confidence filter
         # -------------------------------------------------
