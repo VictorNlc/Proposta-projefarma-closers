@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projefarma · Inventário 100% Precisão</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+            color: #e6edf3;
+            min-height: 100vh;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1a1f3a, #0d1117);
+            padding: 20px 32px;
+            border-bottom: 1px solid #30363d;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b61ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 0;
+            height: calc(100vh - 70px);
+        }
+        
+        .sidebar {
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .card {
+            background: #1c2333;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        
+        .card h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        
+        label {
+            display: block;
+            font-size: 0.8rem;
+            color: #8b949e;
+            margin-bottom: 6px;
+        }
+        
+        input[type="file"],
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 9px 12px;
+            color: #e6edf3;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        
+        input:focus {
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 11px;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #7b61ff);
+            color: #fff;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            opacity: 0.88;
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #00c853, #00897b);
+            color: #fff;
+            margin-top: 8px;
+        }
+        
+        .btn-success:hover {
+            opacity: 0.88;
+        }
+        
+        .canvas-area {
+            background: #0d1117;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .canvas-toolbar {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: #8b949e;
+        }
+        
+        #canvas-wrap {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 16px;
+            position: relative;
+        }
+        
+        #canvas-pdf {
+            cursor: crosshair;
+            display: block;
+            max-width: 100%;
+            user-select: none;
+        }
+        
+        #placeholder {
+            color: #8b949e;
+            text-align: center;
+            padding: 80px 20px;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            margin: auto;
+        }
+        
+        .results-panel {
+            background: #161b22;
+            border-top: 1px solid #30363d;
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .results-panel.show {
+            display: block;
+        }
+        
+        .results-panel h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        
+        th {
+            background: #1c2333;
+            padding: 8px 12px;
+            text-align: left;
+            color: #8b949e;
+            font-weight: 600;
+            font-size: 0.78rem;
+        }
+        
+        td {
+            padding: 7px 12px;
+            border-bottom: 1px solid #21262d;
+        }
+        
+        tr:hover td {
+            background: #1c233344;
+        }
+        
+        .qty {
+            font-weight: 700;
+            color: #00d4ff;
+        }
+        
+        .total-row td {
+            font-weight: 700;
+            border-top: 2px solid #30363d;
+            color: #e6edf3;
+        }
+        
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 12px;
+            color: #8b949e;
+            font-size: 0.85rem;
+        }
+        
+        .spinner.show {
+            display: block;
+        }
+        
+        .badge {
+            background: #00d4ff22;
+            color: #00d4ff;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+        }
+        
+        .alert-success {
+            background: #00c85322;
+            border: 1px solid #00c853;
+            color: #00c853;
+        }
+        
+        .alert-warning {
+            background: #ff980022;
+            border: 1px solid #ff9800;
+            color: #ff9800;
+        }
+        
+        .alert-error {
+            background: #ff454522;
+            border: 1px solid #ff4545;
+            color: #ff4545;
+        }
+
+        /* LOG PANEL */
+        .log-panel {
+            background: #0d1117;
+            border-top: 1px solid #30363d;
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+        }
+        .log-panel.show { display: block; }
+        .log-panel h3 {
+            font-size: 0.85rem; font-weight: 600; color: #8b949e;
+            text-transform: uppercase; margin-bottom: 12px;
+        }
+        .log-entry {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .log-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; cursor: pointer;
+            font-size: 0.82rem; color: #e6edf3;
+        }
+        .log-header:hover { background: #1c233366; }
+        .log-header .num {
+            background: #00d4ff22; color: #00d4ff; font-weight: 700;
+            border-radius: 4px; padding: 2px 7px; min-width: 28px; text-align: center;
+        }
+        .log-header .status-ok { color: #00c853; }
+        .log-header .status-err { color: #ff4545; }
+        .log-header .count { margin-left: auto; color: #8b949e; font-size: 0.75rem; }
+        .log-body {
+            display: none; padding: 8px 12px; border-top: 1px solid #21262d;
+            font-size: 0.78rem; color: #8b949e;
+        }
+        .log-body.open { display: block; }
+        .log-item {
+            display: flex; align-items: center; gap: 6px;
+            padding: 3px 0;
+        }
+        .log-item .fonte {
+            font-size: 0.7rem; padding: 1px 6px; border-radius: 10px;
+            font-weight: 600;
+        }
+        .fonte-openai { background: #7b61ff33; color: #7b61ff; }
+        .fonte-tesseract { background: #00c85333; color: #00c853; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>⚡ Projefarma · Inventário 100% Precisão</h1>
+    </header>
+    
+    <div class="container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="card">
+                <h3>1 · Carregar PDF</h3>
+                <label>Arquivo PDF</label>
+                <input type="file" id="inp-pdf" accept=".pdf">
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <div style="flex: 1;">
+                        <label>Página</label>
+                        <input type="number" id="inp-pagina" value="1" min="1" style="width: 100%;">
+                    </div>
+                    <button class="btn btn-primary" onclick="carregarPDF()" style="margin-top: 18px; flex: 1;">
+                        Renderizar ▶
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>2 · Recortes</h3>
+                <p style="font-size: 0.78rem; color: #8b949e; margin-bottom: 10px;">
+                    Arraste retângulos sobre o layout para marcar áreas de análise.
+                </p>
+                <div id="lista-recortes" style="max-height: 150px; overflow-y: auto;">
+                    <p style="color: #8b949e; font-size: 0.78rem; text-align: center; padding: 10px;">
+                        Nenhum recorte ainda
+                    </p>
+                </div>
+                <button class="btn btn-primary" onclick="analisar()" id="btn-analisar" style="margin-top: 12px;" disabled>
+                    🔍 Analisar
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3>3 · Cliente</h3>
+                <label>Nome do cliente</label>
+                <input type="text" id="inp-cliente" placeholder="Ex: Farmácia XYZ" style="margin-bottom: 10px;">
+                <label>Nome do consultor</label>
+                <input type="text" id="inp-consultor" placeholder="Ex: João Silva">
+                <button class="btn btn-success" onclick="exportarExcel()" id="btn-excel" style="display: none; margin-top: 10px;">
+                    📥 Exportar Excel
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3>4 · Orientação</h3>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem; color: #e6edf3; margin-top: 4px;">
+                    <input type="checkbox" id="chk-rotacionar" style="width: 16px; height: 16px; accent-color: #00d4ff; cursor: pointer;">
+                    Rotacionar Recortes 180°<br>(Planta de cabeça para baixo)
+                </label>
+            </div>
+
+            <div class="card">
+                <h3>5 · Integrar Lovable</h3>
+                <label>URL do Webhook/Endpoint Lovable</label>
+                <input type="text" id="inp-lovable-url" placeholder="https://seu-app-lovable.com/api/webhook" style="margin-bottom: 10px;">
+                <button class="btn btn-primary" onclick="enviarParaLovable()" id="btn-enviar-lovable" style="background: linear-gradient(135deg, #7b61ff, #00d4ff); display: none;">
+                    📤 Enviar JSON
+                </button>
+                <div id="lovable-status" style="margin-top: 8px; font-size: 0.78rem; text-align: center; font-weight: 600;"></div>
+            </div>
+            
+            <div class="spinner" id="spinner">⏳ Analisando... aguarde</div>
+        </div>
+        
+        <!-- CANVAS AREA -->
+        <div class="canvas-area">
+            <div class="canvas-toolbar">
+                <span>🖱 <strong>Arraste</strong> para criar recorte</span>
+                <span id="coord-info" class="badge" style="margin-left: auto;">—</span>
+            </div>
+            
+            <div id="canvas-wrap">
+                <div id="placeholder">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">📐</div>
+                    <strong>Carregue um PDF para começar</strong><br>
+                    Selecione o arquivo e a página, depois clique em <strong>Renderizar ▶</strong>
+                </div>
+                <canvas id="canvas-pdf" style="display: none;"></canvas>
+            </div>
+            
+            <div class="results-panel" id="results-panel">
+                <h3>Inventario Detectado</h3>
+                <table id="tabela-resultado">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-resultado"></tbody>
+                </table>
+            </div>
+
+            <div class="log-panel" id="log-panel">
+                <h3>Raciocinio da IA (Por Recorte)</h3>
+                <div id="log-entries"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas-pdf');
+        const ctx = canvas.getContext('2d');
+        const wrap = document.getElementById('canvas-wrap');
+        
+        let pdfImageData = null;
+        let recortes = [];
+        let desenhando = false;
+        let arrastando = null;
+        let startImgX, startImgY, currentRect = null;
+        let offsetArrastarX = 0, offsetArrastarY = 0;
+        let selecionadoId = null;
+        let idCounter = 0;
+        
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isPanning = false;
+        let panStartX, panStartY;
+        
+        function screenToImg(e) {
+            const rect = canvas.getBoundingClientRect();
+            const sx = e.clientX - rect.left;
+            const sy = e.clientY - rect.top;
+            return {
+                x: Math.round((sx - offsetX) / scale),
+                y: Math.round((sy - offsetY) / scale)
+            };
+        }
+        
+        async function carregarPDF() {
+            const file = document.getElementById('inp-pdf').files[0];
+            if (!file) {
+                alert('Selecione um arquivo PDF primeiro.');
+                return;
+            }
+            
+            const pagina = document.getElementById('inp-pagina').value;
+            const fd = new FormData();
+            fd.append('pdf', file);
+            fd.append('pagina', pagina);
+            
+            try {
+                const r = await fetch('/api/renderizar-pdf', { method: 'POST', body: fd });
+                const data = await r.json();
+                
+                if (data.erro) {
+                    alert(data.erro);
+                    return;
+                }
+                
+                document.getElementById('placeholder').style.display = 'none';
+                canvas.style.display = 'block';
+                
+                const wrapW = wrap.clientWidth - 32;
+                const wrapH = wrap.clientHeight - 32;
+                canvas.width = wrapW;
+                canvas.height = wrapH;
+                
+                const img = new Image();
+                img.onload = () => {
+                    pdfImageData = img;
+                    const fitScale = Math.min(wrapW / img.width, wrapH / img.height, 1);
+                    scale = fitScale;
+                    offsetX = (wrapW - img.width * scale) / 2;
+                    offsetY = (wrapH - img.height * scale) / 2;
+                    redraw();
+                };
+                img.src = 'data:image/png;base64,' + data.imagem;
+            } catch (e) {
+                alert('Erro ao carregar PDF.');
+            }
+        }
+        
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            if (!pdfImageData) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const factor = e.deltaY < 0 ? 1.12 : 0.89;
+            const newScale = Math.min(20, Math.max(0.1, scale * factor));
+            
+            offsetX = mx - (mx - offsetX) * (newScale / scale);
+            offsetY = my - (my - offsetY) * (newScale / scale);
+            scale = newScale;
+            
+            document.getElementById('coord-info').textContent = `Zoom ${(scale * 100).toFixed(0)}%`;
+            redraw();
+        }, { passive: false });
+        
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 2) {
+                isPanning = true;
+                panStartX = e.clientX - offsetX;
+                panStartY = e.clientY - offsetY;
+                canvas.style.cursor = 'grabbing';
+                return;
+            }
+            
+            if (!pdfImageData || e.button !== 0) return;
+            
+            const pos = screenToImg(e);
+            const sobRecorte = [...recortes].reverse().find(r =>
+                pos.x >= r.x && pos.x <= r.x + r.width &&
+                pos.y >= r.y && pos.y <= r.y + r.height
+            );
+            
+            if (sobRecorte) {
+                arrastando = sobRecorte;
+                selecionadoId = sobRecorte.id;
+                offsetArrastarX = pos.x - sobRecorte.x;
+                offsetArrastarY = pos.y - sobRecorte.y;
+                canvas.style.cursor = 'move';
+            } else {
+                desenhando = true;
+                selecionadoId = null;
+                startImgX = pos.x;
+                startImgY = pos.y;
+                currentRect = null;
+            }
+            
+            redraw();
+        });
+        
+        canvas.addEventListener('mousemove', e => {
+            if (isPanning) {
+                offsetX = e.clientX - panStartX;
+                offsetY = e.clientY - panStartY;
+                redraw();
+                return;
+            }
+            
+            const pos = screenToImg(e);
+            document.getElementById('coord-info').textContent = `x:${pos.x} y:${pos.y}`;
+            
+            if (arrastando) {
+                arrastando.x = pos.x - offsetArrastarX;
+                arrastando.y = pos.y - offsetArrastarY;
+                redraw();
+                return;
+            }
+            
+            const sobRecorte = recortes.find(r =>
+                pos.x >= r.x && pos.x <= r.x + r.width &&
+                pos.y >= r.y && pos.y <= r.y + r.height
+            );
+            canvas.style.cursor = sobRecorte ? 'move' : 'crosshair';
+            
+            if (!desenhando) return;
+            
+            currentRect = {
+                x: Math.min(startImgX, pos.x),
+                y: Math.min(startImgY, pos.y),
+                width: Math.abs(pos.x - startImgX),
+                height: Math.abs(pos.y - startImgY)
+            };
+            redraw();
+        });
+        
+        canvas.addEventListener('mouseup', e => {
+            if (e.button === 2) {
+                isPanning = false;
+                canvas.style.cursor = 'crosshair';
+                return;
+            }
+            
+            if (arrastando) {
+                arrastando = null;
+                return;
+            }
+            
+            if (!desenhando) return;
+            desenhando = false;
+            
+            if (currentRect && currentRect.width > 5 && currentRect.height > 5) {
+                idCounter++;
+                const baseRot = document.getElementById('chk-rotacionar').checked ? 180 : 0;
+                recortes.push({ ...currentRect, id: idCounter, rotacao: baseRot });
+                currentRect = null;
+                atualizarLista();
+                redraw();
+            }
+        });
+        
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        function redraw() {
+            if (!pdfImageData) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale, scale);
+            
+            ctx.drawImage(pdfImageData, 0, 0);
+            
+            // Desenha recortes
+            for (const r of recortes) {
+                const isSelected = r.id === selecionadoId;
+                ctx.strokeStyle = isSelected ? '#7b61ff' : '#00d4ff';
+                ctx.lineWidth = isSelected ? 3 : 2;
+                ctx.strokeRect(r.x, r.y, r.width, r.height);
+                
+                if (isSelected) {
+                    ctx.fillStyle = 'rgba(123, 97, 255, 0.1)';
+                    ctx.fillRect(r.x, r.y, r.width, r.height);
+                }
+            }
+            
+            // Desenha recorte em progresso
+            if (currentRect) {
+                ctx.strokeStyle = '#00d4ff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+                ctx.setLineDash([]);
+            }
+            
+            ctx.restore();
+        }
+        
+        function rotacionarRecorte(id) {
+            const r = recortes.find(x => x.id === id);
+            if (r) {
+                r.rotacao = ((r.rotacao || 0) + 90) % 360;
+                atualizarLista();
+                redraw();
+            }
+        }
+        
+        function atualizarLista() {
+            const lista = document.getElementById('lista-recortes');
+            if (recortes.length === 0) {
+                lista.innerHTML = '<p style="color: #8b949e; font-size: 0.78rem; text-align: center; padding: 10px;">Nenhum recorte ainda</p>';
+                document.getElementById('btn-analisar').disabled = true;
+                return;
+            }
+            
+            lista.innerHTML = recortes.map((r, i) => `
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem;">
+                    <span style="background: #00d4ff22; color: #00d4ff; font-weight: 700; border-radius: 4px; padding: 2px 7px; min-width: 28px; text-align: center;">
+                        ${i + 1}
+                    </span>
+                    <span>${r.width}x${r.height}px</span>
+                    <span class="badge" style="background: #7b61ff22; color: #7b61ff; font-size: 0.72rem; padding: 2px 6px;">
+                        ${r.rotacao || 0}°
+                    </span>
+                    <button onclick="rotacionarRecorte(${r.id})" style="background: #7b61ff22; border: none; color: #7b61ff; border-radius: 5px; padding: 3px 7px; cursor: pointer; font-size: 0.8rem; margin-left: auto;" title="Girar este recorte">
+                        🔄
+                    </button>
+                    <button onclick="removerRecorte(${r.id})" style="background: #ff454522; border: none; color: #ff4545; border-radius: 5px; padding: 3px 7px; cursor: pointer; font-size: 0.8rem;">
+                        ✕
+                    </button>
+                </div>
+            `).join('');
+            
+            document.getElementById('btn-analisar').disabled = false;
+        }
+        
+        function removerRecorte(id) {
+            recortes = recortes.filter(r => r.id !== id);
+            atualizarLista();
+            redraw();
+        }
+        
+        async function analisar() {
+            if (recortes.length === 0) {
+                alert('Crie pelo menos um recorte.');
+                return;
+            }
+            
+            document.getElementById('spinner').classList.add('show');
+            document.getElementById('btn-analisar').disabled = true;
+            
+            try {
+                const pdf = document.getElementById('inp-pdf').files[0];
+                const pagina = document.getElementById('inp-pagina').value;
+                const cliente = document.getElementById('inp-cliente').value || 'Proposta';
+                
+                const fd = new FormData();
+                fd.append('pdf', pdf);
+                fd.append('pagina', pagina);
+                fd.append('recortes', JSON.stringify(recortes));
+                fd.append('cliente', cliente);
+                fd.append('rotacionar', document.getElementById('chk-rotacionar').checked ? 'true' : 'false');
+                
+                const r = await fetch('/api/analisar', { method: 'POST', body: fd });
+                const data = await r.json();
+                
+                if (data.erro) {
+                    alert('Erro: ' + data.erro);
+                    return;
+                }
+                
+                // Exibe resultados
+                const tbody = document.getElementById('tbody-resultado');
+                tbody.innerHTML = data.inventario.map(item => `
+                    <tr>
+                        <td>${item.nome}</td>
+                        <td class="qty">${item.quantidade}</td>
+                    </tr>
+                `).join('');
+                
+                // Total
+                tbody.innerHTML += `
+                    <tr class="total-row">
+                        <td>TOTAL</td>
+                        <td class="qty">${data.total}</td>
+                    </tr>
+                `;
+                
+                document.getElementById('results-panel').classList.add('show');
+                document.getElementById('btn-excel').style.display = 'block';
+                document.getElementById('btn-enviar-lovable').style.display = 'block';
+                
+                // Renderiza logs detalhados por recorte
+                renderLogs(data.logs || []);
+                
+                // Armazena dados para exportação
+                window.ultimoInventario = data.inventario;
+                window.ultimoCliente = cliente;
+                window.ultimoConsultor = document.getElementById('inp-consultor').value || 'Consultor';
+            } catch (e) {
+                alert('Erro ao analisar: ' + e.message);
+            } finally {
+                document.getElementById('spinner').classList.remove('show');
+                document.getElementById('btn-analisar').disabled = false;
+            }
+        }
+        
+        async function exportarExcel() {
+            if (!window.ultimoInventario) {
+                alert('Nenhum inventário para exportar.');
+                return;
+            }
+            
+            try {
+                const r = await fetch('/api/exportar-excel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inventario: window.ultimoInventario,
+                        cliente: window.ultimoCliente
+                    })
+                });
+                
+                const blob = await r.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `inventario_${window.ultimoCliente}.xlsx`;
+                a.click();
+            } catch (e) {
+                alert('Erro ao exportar: ' + e.message);
+            }
+        }
+        
+        function renderLogs(logs) {
+            const container = document.getElementById('log-entries');
+            if (!logs.length) {
+                container.innerHTML = '<p style="color:#8b949e;font-size:0.8rem;">Nenhum log disponivel.</p>';
+                return;
+            }
+            
+            container.innerHTML = logs.map(log => {
+                if (log.status === 'ERRO') {
+                    return `
+                        <div class="log-entry">
+                            <div class="log-header">
+                                <span class="num">#${log.recorte}</span>
+                                <span class="status-err">ERRO</span>
+                                <span style="color:#ff4545;font-size:0.75rem;">${log.erro || 'Erro desconhecido'}</span>
+                            </div>
+                        </div>`;
+                }
+                
+                const itens = log.itens_encontrados || [];
+                const total = log.total || 0;
+                const consolidado = log.consolidado || {};
+                
+                const itensHTML = itens.length > 0
+                    ? itens.map(it => `
+                        <div class="log-item">
+                            <span class="fonte ${it.fonte === 'openai' ? 'fonte-openai' : 'fonte-tesseract'}">${it.fonte}</span>
+                            <span style="color:#e6edf3;">${it.nome}</span>
+                            <span style="color:#00d4ff;font-weight:700;">x${it.qty}</span>
+                        </div>
+                    `).join('')
+                    : '<span style="color:#8b949e;">Nenhum item encontrado</span>';
+                
+                const consolidadoHTML = Object.keys(consolidado).length > 0
+                    ? Object.entries(consolidado).map(([k, v]) =>
+                        `<span style="background:#1c2333;padding:2px 8px;border-radius:4px;margin:2px;display:inline-block;">${k}: <strong style="color:#00d4ff;">${v}</strong></span>`
+                    ).join(' ')
+                    : '';
+                
+                const rawJson = log.raw_ai_data ? JSON.stringify(log.raw_ai_data, null, 2) : 'Nenhum JSON retornado';
+                const imageHtml = log.debug_image ? `<div style="margin-top: 10px;"><a href="${log.debug_image}" target="_blank"><img src="${log.debug_image}" style="max-width: 100%; max-height: 150px; border: 1px solid #30363d; border-radius: 4px;"></a><div style="font-size: 0.7rem; color: #8b949e; text-align: center;">Clique na imagem para ampliar</div></div>` : '';
+                
+                return `
+                    <div class="log-entry">
+                        <div class="log-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                            <span class="num">#${log.recorte}</span>
+                            <span class="status-ok">OK</span>
+                            <span>${consolidadoHTML}</span>
+                            <span class="count">${total} iten${total !== 1 ? 's' : ''} | clique para detalhes</span>
+                        </div>
+                        <div class="log-body">
+                            <div style="margin-bottom:6px;font-weight:600;color:#e6edf3;">Deteccoes brutas:</div>
+                            ${itensHTML}
+                            <div style="margin-top: 12px; font-weight:600; color:#e6edf3;">JSON Bruto (OpenAI):</div>
+                            <pre style="background: #0d1117; padding: 8px; border-radius: 4px; font-size: 0.7rem; color: #00d4ff; overflow-x: auto;">${rawJson}</pre>
+                            ${imageHtml}
+                        </div>
+                    </div>`;
+            }).join('');
+            
+            document.getElementById('log-panel').classList.add('show');
+        }
+
+        // Recupera URL do webhook e consultor salvos no localStorage
+        document.addEventListener("DOMContentLoaded", () => {
+            const savedUrl = localStorage.getItem("lovable_webhook_url");
+            if (savedUrl) {
+                document.getElementById("inp-lovable-url").value = savedUrl;
+            }
+            const savedConsultor = localStorage.getItem("lovable_consultor_nome");
+            if (savedConsultor) {
+                document.getElementById("inp-consultor").value = savedConsultor;
+            }
+        });
+
+        // Envia o JSON do inventário para o Webhook do Lovable
+        async function enviarParaLovable() {
+            const url = document.getElementById("inp-lovable-url").value.trim();
+            if (!url) {
+                alert("Por favor, insira a URL do webhook ou endpoint do seu site Lovable.");
+                return;
+            }
+            
+            if (!window.ultimoInventario) {
+                alert("Nenhum inventário disponível para enviar. Faça a análise primeiro.");
+                return;
+            }
+            
+            const consultor = document.getElementById("inp-consultor").value.trim();
+            
+            // Salva para conveniência nas próximas visitas
+            localStorage.setItem("lovable_webhook_url", url);
+            if (consultor) {
+                localStorage.setItem("lovable_consultor_nome", consultor);
+            }
+            
+            const statusDiv = document.getElementById("lovable-status");
+            statusDiv.innerHTML = "⏳ Enviando dados para o Lovable...";
+            statusDiv.style.color = "#8b949e";
+            
+            const btn = document.getElementById("btn-enviar-lovable");
+            btn.disabled = true;
+            
+            try {
+                const payload = {
+                    cliente: window.ultimoCliente || "Cliente Geral",
+                    consultor: consultor || "Consultor Geral",
+                    data_analise: new Date().toISOString(),
+                    total_itens: window.ultimoInventario.reduce((acc, cur) => acc + cur.quantidade, 0),
+                    inventario: window.ultimoInventario
+                };
+                
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.ok) {
+                    statusDiv.innerHTML = "✅ Enviado com sucesso!";
+                    statusDiv.style.color = "#00c853";
+                } else {
+                    statusDiv.innerHTML = `❌ Falha ao enviar: Status ${response.status}`;
+                    statusDiv.style.color = "#ff4545";
+                }
+            } catch (e) {
+                statusDiv.innerHTML = `❌ Erro de rede: ${e.message}`;
+                statusDiv.style.color = "#ff4545";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
