@@ -900,8 +900,7 @@
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": "Bearer projefarma",
-                        "apikey": "projefarma"
+                        "x-webhook-secret": "projefarma"
                     },
                     body: JSON.stringify(payload)
                 });
