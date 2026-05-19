@@ -178,7 +178,8 @@ CATALOG_VARIANTS = {
     "CESTAO": [
         "CESTAO", "CESTÃO", "CESTÃO 400", "CESTAO 400", "CESTO",
         "CEST 400", "CESTO 400", "EXPOSITOR CESTAO", "CESTO EXPOSITOR",
-        "GESTÃO", "GESTAO"
+        "GESTÃO", "GESTAO", "RESTAG", "RESTÃO", "RESTAO", "REST 400",
+        "RESTAG 400", "RESTAG 400X400"
     ],
     
     "ESMALTES": [
