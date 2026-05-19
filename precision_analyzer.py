@@ -95,10 +95,11 @@ class PrecisionAnalyzer:
                             f"   - **BASE 1200:** O item 'BASE 1200' (ou 'BASE 1200mm') representa a base/plinto expositor. Ele geralmente tem caixas e produtos coloridos (vermelhos, roxos, etc.) desenhados em cima e a escrita 'BASE 1200mm' (ou 'BASE 1200') no meio. Se você vir a escrita 'BASE' e '1200' ou '1200mm' na imagem, mesmo que haja produtos coloridos desenhados por cima tampando parte do texto, você DEVE retornar o JSON com o item 'BASE 1200'! Não confunda com 'PF CANALETADO'!\n"
                             f"   - **ESMALTES:** Se a estante/expositor tem escrito 'ESMALTES' ou 'ESMALTE' (ex: 'ESMALTES 500mm', 'ESMALTES 807mm'): Classifique EXATAMENTE como 'ESMALTES'. Preste muita atenção se houver outro móvel ao lado no mesmo recorte (como 'PF CANALETADO 807mm' grudado ou ao lado dele), você DEVE retornar AMBOS no JSON final com suas respectivas quantidades!\n"
                             f"3. ⚠️ REGRA EXCLUSIVA DO CESTÃO: O Cestão é um expositor promocional isolado. Ele possui produtos representados em cima que aparecem como preenchimentos verdes ou círculos/esferas organizados em matriz (representando cestos).\n"
-                            f"   - **⚠️ ATENÇÃO EXTRAORDINÁRIA:** O texto na planta pode dizer 'CESTÃO', 'CESTAO', ou conter variações e abreviações/erros de OCR como 'RESTAG', 'RESTÃO', 'RESTAO', 'REST 400', 'GESTÃO', 'GESTAO', geralmente acompanhados de '400' ou '400x400'. Todos estes são, sem dúvida, o item 'CESTAO'!\n"
-                            f"   - Se o recorte contiver DOIS cestões (ex: uma estante verde na esquerda E uma matriz de círculos/esferas na direita, como em muitos recortes grandes de cestões), você DEVE classificar como 'CESTAO' com qtd: 2!\n"
-                            f"   - Se apenas um desses padrões (ou apenas um bloco) estiver presente, classifique como 'CESTAO' com qtd: 1.\n"
-                            f"   - IMPORTANTE: Não retorne qtd: 1 se vir os dois blocos (o verde e o de círculos) juntos na mesma imagem! Retorne qtd: 2! Não confunda estantes normais com cestão.\n"
+                            f"   - **Existem DOIS modelos de Cestão no catálogo da Projefarma:**\n"
+                            f"     1. **'CESTAO 400'** (Cestão 400x400): É o modelo menor de 400mm. O texto na planta diz 'CESTÃO 400', 'CESTAO 400', ou contém variações como 'RESTAG 400', 'REST 400', 'RESTAG 400X400', 'RESTÃO 400'. Se houver qualquer menção ao número '400' ou se for um cesto quadrado pequeno de 400mm, você DEVE retornar exatamente o nome 'CESTAO 400' no JSON final!\n"
+                            f"     2. **'CESTAO'** (Cestão Padrão/Geral): Classifique como 'CESTAO' apenas se for um cestão geral sem menção a '400' ou se disser apenas 'CESTÃO' / 'CESTAO'.\n"
+                            f"   - Se o recorte contiver DOIS cestões pequenos (ex: dois quadrados de 400x400 no mesmo recorte), você DEVE classificar como 'CESTAO 400' com qtd: 2!\n"
+                            f"   - Se apenas um cesto quadrado de 400mm estiver presente, classifique como 'CESTAO 400' com qtd: 1.\n"
 f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um expositor promocional isolado, quadrado (400x400) ou redondo. Ele **NUNCA** deve ser confundido com balcões de atendimento, caixas (checkout) ou painéis. Se você vir um desenho que mostre um balcão com o desenho de um computador/monitor/teclado em cima, ou um espaço para a cadeira do operador, isto é um **CAIXA** ou **CHECKOUT**, e **NUNCA** um Cestão! Não classifique desenhos de balcões com computadores/monitores ou caixas registradoras como 'CESTAO'!\n\n"
                             f"⚠️ NUNCA retorne um JSON vazio '{{}}' se houver um móvel visível na imagem! Se vir letras (como 'PDV', 'BA', 'MED', 'PF', 'ESMALTES') e um número de medida legível ou parcialmente oculto por outros desenhos, você DEVE retornar o JSON com o item correspondente correto de acordo com as regras acima! Se o texto disser claramente 'MED' e '807mm', retorne 'MED 807' e não confunda com balcões! Se disser claramente 'MED' e '500mm', retorne 'MED 500' e não confunda com 'MED 807'! Se houver múltiplos móveis (como 'ESMALTES 500mm' E 'PF CANALETADO 807mm' na mesma imagem), retorne uma lista com TODOS eles!\n"
                             f"Retorne JSON: {{\"achados\": [{{ \"nome\": \"TEXTO_LIDO\", \"qtd\": 1 }}]}}"
@@ -126,7 +127,7 @@ f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um ex
                 if match:
                     if "GOND" in match:
                         qty_ai = 1
-                    if match == "CESTAO":
+                    if match in ("CESTAO", "CESTAO 400"):
                         qty_ai = min(qty_ai, 2)
                     results.append({"item": match, "fonte": "openai", "qty": qty_ai})
                     self._log(f"[OpenAI] Found: {match} (qty {qty_ai})")
@@ -139,7 +140,7 @@ f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um ex
         # Guard‑rails para o CESTÃO:
         # 1. Se CESTÃO estiver no recorte, ignoramos qualquer detecção de CAIXA/CHECKOUT
         #    (pois são áreas fisicamente separadas na farmácia e o CESTÃO é recortado isoladamente)
-        has_cestao = any(r["item"] == "CESTAO" for r in results)
+        has_cestao = any(r["item"] in ("CESTAO", "CESTAO 400") for r in results)
         if has_cestao:
             results = [r for r in results if r["item"] not in ("CAIXA 600", "CAIXA 1000", "CHECKOUT", "CHECKOUT L")]
 
