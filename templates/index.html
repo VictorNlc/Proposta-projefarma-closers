@@ -908,6 +908,29 @@
                 if (response.ok) {
                     statusDiv.innerHTML = "✅ Enviado com sucesso!";
                     statusDiv.style.color = "#00c853";
+                    
+                    try {
+                        const resData = await response.json();
+                        let targetUrl = resData.redirect_url || resData.proposal_url || resData.url;
+                        
+                        if (!targetUrl && resData.proposal_id) {
+                            // Constrói uma URL caso apenas o ID seja retornado
+                            try {
+                                const urlObj = new URL(url);
+                                targetUrl = `${urlObj.origin}/propostas/${resData.proposal_id}`;
+                            } catch(e) {
+                                targetUrl = `/propostas/${resData.proposal_id}`;
+                            }
+                        }
+                        
+                        if (targetUrl) {
+                            statusDiv.innerHTML += `<br><a href="${targetUrl}" target="_blank" class="btn" style="display:inline-block; margin-top:10px; background:linear-gradient(135deg, #00c853, #b2ff59); color:#000; font-weight:800; padding:8px 16px; text-decoration:none; border-radius:6px; box-shadow: 0 4px 15px rgba(0,200,83,0.3); font-size: 0.8rem; animation: pulse 2s infinite;">➡️ ABRIR PROPOSTA NO LOVABLE</a>`;
+                            // Tenta abrir automaticamente em uma nova aba
+                            window.open(targetUrl, '_blank');
+                        }
+                    } catch (err) {
+                        console.log("Resposta não continha JSON válido ou chaves de redirecionamento:", err);
+                    }
                 } else {
                     statusDiv.innerHTML = `❌ Falha ao enviar: Status ${response.status}`;
                     statusDiv.style.color = "#ff4545";
