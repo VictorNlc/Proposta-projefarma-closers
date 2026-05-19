@@ -926,9 +926,9 @@
                         if (targetUrl) {
                             // Se a URL retornada for relativa (começando com /), resolvemos usando o domínio do site Lovable do usuário
                             if (targetUrl.startsWith("/")) {
-                                let baseSiteUrl = localStorage.getItem("lovable_site_url") || "";
+                                let baseSiteUrl = localStorage.getItem("lovable_site_url") || "https://propostaprojefarma.lovable.app";
                                 if (!baseSiteUrl) {
-                                    baseSiteUrl = prompt("Envio concluído com sucesso!\nPara que possamos te redirecionar direto para a proposta, digite a URL do seu site da Lovable (ex: https://seu-app.lovable.app):");
+                                    baseSiteUrl = prompt("Envio concluído com sucesso!\nPara que possamos te redirecionar direto para a proposta, digite a URL do seu site da Lovable (ex: https://propostaprojefarma.lovable.app):");
                                     if (baseSiteUrl) {
                                         baseSiteUrl = baseSiteUrl.trim().replace(/\/$/, "");
                                         localStorage.setItem("lovable_site_url", baseSiteUrl);
