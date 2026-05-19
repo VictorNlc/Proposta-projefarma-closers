@@ -131,7 +131,7 @@ f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um ex
                     if "GOND" in match:
                         qty_ai = 1
                     if match in ("CESTAO", "CESTAO 400"):
-                        qty_ai = min(qty_ai, 2)
+                        qty_ai = 1
                     results.append({"item": match, "fonte": "openai", "qty": qty_ai})
                     self._log(f"[OpenAI] Found: {match} (qty {qty_ai})")
         except Exception as e:
