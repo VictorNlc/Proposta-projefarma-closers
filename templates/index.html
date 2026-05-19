@@ -924,6 +924,21 @@
                         }
                         
                         if (targetUrl) {
+                            // Se a URL retornada for relativa (começando com /), resolvemos usando o domínio do site Lovable do usuário
+                            if (targetUrl.startsWith("/")) {
+                                let baseSiteUrl = localStorage.getItem("lovable_site_url") || "";
+                                if (!baseSiteUrl) {
+                                    baseSiteUrl = prompt("Envio concluído com sucesso!\nPara que possamos te redirecionar direto para a proposta, digite a URL do seu site da Lovable (ex: https://seu-app.lovable.app):");
+                                    if (baseSiteUrl) {
+                                        baseSiteUrl = baseSiteUrl.trim().replace(/\/$/, "");
+                                        localStorage.setItem("lovable_site_url", baseSiteUrl);
+                                    }
+                                }
+                                if (baseSiteUrl) {
+                                    targetUrl = baseSiteUrl + targetUrl;
+                                }
+                            }
+                            
                             statusDiv.innerHTML += `<br><a href="${targetUrl}" target="_blank" class="btn" style="display:inline-block; margin-top:10px; background:linear-gradient(135deg, #00c853, #b2ff59); color:#000; font-weight:800; padding:8px 16px; text-decoration:none; border-radius:6px; box-shadow: 0 4px 15px rgba(0,200,83,0.3); font-size: 0.8rem; animation: pulse 2s infinite;">➡️ ABRIR PROPOSTA NO LOVABLE</a>`;
                             // Tenta abrir automaticamente em uma nova aba
                             window.open(targetUrl, '_blank');
