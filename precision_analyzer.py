@@ -4,6 +4,7 @@
 import json
 import base64
 import io
+import threading
 # pytesseract removed as local OCR is disabled in favor of OpenAI Vision for 100% precision on Render
 from collections import Counter
 from typing import Dict, List, Optional
@@ -17,12 +18,23 @@ class PrecisionAnalyzer:
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.analysis_logs = []
+        self._thread_local = threading.local()
         # Adjustable parameters
         self.ocr_confidence_threshold = 80   # minimum OCR confidence (%)
         self.iou_threshold = 0.3            # IoU threshold for duplicate crops (more aggressive merging)
         self.log_file = "analysis.log"
         # Ensure log file exists
         open(self.log_file, "a").close()
+
+    @property
+    def last_raw_ai_data(self):
+        """Thread-safe access to raw AI response data."""
+        return getattr(self._thread_local, 'last_raw_ai_data', None)
+
+    @last_raw_ai_data.setter
+    def last_raw_ai_data(self, value):
+        """Thread-safe storage of raw AI response data."""
+        self._thread_local.last_raw_ai_data = value
 
     def _log(self, msg: str):
         """Write debug messages to stdout and to the log file."""
