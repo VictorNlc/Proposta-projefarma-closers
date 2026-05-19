@@ -18,6 +18,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
 from flask_cors import CORS
+from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
 
@@ -102,7 +103,6 @@ def analisar():
         recortes_deduplic = recortes
         
         pdf_bytes = pdf_file.read()
-        ZOOM_IA = 8.0
         scale_x = scale_y = 2.0
         
         # Acumula inventário consolidado (deduplicado) e total bruto (inclui todas as ocorrências)
@@ -110,9 +110,10 @@ def analisar():
         raw_total = 0
         logs = []
         
-        for i, recorte in enumerate(recortes_deduplic):
+        # Função auxiliar executada por cada thread para processar um único recorte em paralelo
+        def processar_recorte(i, recorte):
             try:
-                # Extrai recorte do PDF
+                # Cada thread abre sua própria instância isolada do PDF a partir dos bytes na memória
                 doc_local = fitz.open(stream=pdf_bytes, filetype="pdf")
                 page_local = doc_local[pagina - 1]
                 
@@ -123,7 +124,6 @@ def analisar():
                 rect = fitz.Rect(x1_pdf, y1_pdf, x2_pdf, y2_pdf)
                 
                 # Dynamic crop zoom: Ensure the cropped image has at least 600px in its largest dimension
-                # Cap the zoom factor between 8.0 and 30.0 to make tiny texts perfectly crisp without memory issues.
                 max_dim = max(rect.width, rect.height)
                 zoom_factor = max(8.0, min(30.0, 600.0 / max_dim)) if max_dim > 0 else 8.0
                 
@@ -145,12 +145,10 @@ def analisar():
                 debug_path = os.path.join(app.config['DEBUG_FOLDER'], f"crop_{i}_{int(time.time()*1000)}.png")
                 crop_img.save(debug_path)
                 
-                # Analisa com sistema Híbrido (OCR Local + OpenAI Vision)
+                # Analisa com OpenAI Vision
                 resultados_recorte = analyzer.analyze_image(crop_img)
                 
                 # Regra especial para PF 807 baseada na altura (tamanho Y do recorte)
-                # Se a altura for maior ou igual a 51 (ex: entre 55 e 57), vira "PF 807 COM FUNDO".
-                # Se for menor que 51 (ex: ~45), continua "PF 807" normal.
                 h_recorte = recorte.get("height", 0)
                 for r in resultados_recorte:
                     if r["item"] == "PF 807":
@@ -163,11 +161,47 @@ def analisar():
                 # Consolida o que foi achado neste recorte específico
                 inventario_recorte = analyzer.consolidate(resultados_recorte)
                 
-                # Atualiza inventário consolidado (deduplicado entre recortes)
+                doc_local.close()
+                
+                return {
+                    "status": "OK",
+                    "index": i,
+                    "resultados_recorte": resultados_recorte,
+                    "inventario_recorte": inventario_recorte,
+                    "debug_path": debug_path,
+                    "raw_ai_data": getattr(analyzer, 'last_raw_ai_data', None)
+                }
+            except Exception as e:
+                try:
+                    doc_local.close()
+                except:
+                    pass
+                return {
+                    "status": "ERRO",
+                    "index": i,
+                    "erro": str(e)
+                }
+
+        # Executa a análise concorrente usando um pool de threads
+        with ThreadPoolExecutor(max_workers=15) as executor:
+            resultados_futures = list(executor.map(
+                lambda pair: processar_recorte(pair[0], pair[1]),
+                enumerate(recortes_deduplic)
+            ))
+            
+        # Consolida todos os resultados em ordem sequencial para preservar a integridade dos logs
+        for res in resultados_futures:
+            i = res["index"]
+            if res["status"] == "OK":
+                resultados_recorte = res["resultados_recorte"]
+                inventario_recorte = res["inventario_recorte"]
+                debug_path = res["debug_path"]
+                
+                # Atualiza inventário consolidado
                 for nome, qty in inventario_recorte.items():
                     inventario_consolidado[nome] = inventario_consolidado.get(nome, 0) + qty
                 
-                # Soma quantidade bruta (conta todas as ocorrências antes de deduplicar entre recortes)
+                # Soma quantidade bruta
                 raw_total += sum(inventario_recorte.values())
                 
                 logs.append({
@@ -177,19 +211,16 @@ def analisar():
                         {"nome": r["item"], "qty": r.get("qty", 1), "fonte": r.get("fonte", "?")}
                         for r in resultados_recorte
                     ],
-                    "raw_ai_data": getattr(analyzer, 'last_raw_ai_data', None),
+                    "raw_ai_data": res["raw_ai_data"],
                     "debug_image": f"/api/debug-image/{os.path.basename(debug_path)}",
                     "consolidado": {k: v for k, v in inventario_recorte.items()},
                     "total": sum(inventario_recorte.values())
                 })
-                
-                doc_local.close()
-            
-            except Exception as e:
+            else:
                 logs.append({
                     "recorte": i + 1,
                     "status": "ERRO",
-                    "erro": str(e)
+                    "erro": res["erro"]
                 })
         
         # Formata resposta
