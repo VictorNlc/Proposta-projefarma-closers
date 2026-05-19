@@ -723,12 +723,20 @@
                 
                 // Exibe resultados
                 const tbody = document.getElementById('tbody-resultado');
-                tbody.innerHTML = data.inventario.map(item => `
-                    <tr>
-                        <td>${item.nome}</td>
-                        <td class="qty">${item.quantidade}</td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = data.inventario.map(item => {
+                    let acabamentoBadge = '';
+                    if (item.acabamento === 'preto') {
+                        acabamentoBadge = ` <span class="badge" style="background: rgba(28, 35, 51, 0.8); color: #ffffff; border: 1px solid #ffffff; font-size: 0.7rem; padding: 1px 6px;">PRETO (+52%)</span>`;
+                    } else if (item.acabamento === 'amadeirado') {
+                        acabamentoBadge = ` <span class="badge" style="background: rgba(139, 69, 19, 0.2); color: #cd853f; border: 1px solid #cd853f; font-size: 0.7rem; padding: 1px 6px;">AMADEIRADO (+44%)</span>`;
+                    }
+                    return `
+                        <tr>
+                            <td>${item.nome}${acabamentoBadge}</td>
+                            <td class="qty">${item.quantidade}</td>
+                        </tr>
+                    `;
+                }).join('');
                 
                 // Total
                 tbody.innerHTML += `
@@ -808,19 +816,27 @@
                 const consolidado = log.consolidado || {};
                 
                 const itensHTML = itens.length > 0
-                    ? itens.map(it => `
-                        <div class="log-item">
-                            <span class="fonte ${it.fonte === 'openai' ? 'fonte-openai' : 'fonte-tesseract'}">${it.fonte}</span>
-                            <span style="color:#e6edf3;">${it.nome}</span>
-                            <span style="color:#00d4ff;font-weight:700;">x${it.qty}</span>
-                        </div>
-                    `).join('')
+                    ? itens.map(it => {
+                        const acabamentoStr = it.acabamento && it.acabamento !== 'normal' ? ` (${it.acabamento})` : '';
+                        return `
+                            <div class="log-item">
+                                <span class="fonte ${it.fonte === 'openai' ? 'fonte-openai' : 'fonte-tesseract'}">${it.fonte}</span>
+                                <span style="color:#e6edf3;">${it.nome}${acabamentoStr}</span>
+                                <span style="color:#00d4ff;font-weight:700;">x${it.qty}</span>
+                            </div>
+                        `;
+                    }).join('')
                     : '<span style="color:#8b949e;">Nenhum item encontrado</span>';
                 
                 const consolidadoHTML = Object.keys(consolidado).length > 0
-                    ? Object.entries(consolidado).map(([k, v]) =>
-                        `<span style="background:#1c2333;padding:2px 8px;border-radius:4px;margin:2px;display:inline-block;">${k}: <strong style="color:#00d4ff;">${v}</strong></span>`
-                    ).join(' ')
+                    ? Object.entries(consolidado).map(([k, v]) => {
+                        let displayName = k;
+                        if (k.includes('#')) {
+                            const [nome, acabamento] = k.split('#');
+                            displayName = acabamento !== 'normal' ? `${nome} (${acabamento})` : nome;
+                        }
+                        return `<span style="background:#1c2333;padding:2px 8px;border-radius:4px;margin:2px;display:inline-block;">${displayName}: <strong style="color:#00d4ff;">${v}</strong></span>`;
+                    }).join(' ')
                     : '';
                 
                 const rawJson = log.raw_ai_data ? JSON.stringify(log.raw_ai_data, null, 2) : 'Nenhum JSON retornado';

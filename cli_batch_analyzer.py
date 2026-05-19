@@ -58,8 +58,26 @@ class BatchAnalyzer:
             # Consolida resultados
             inventario_dict = self.analyzer.consolidate(resultados)
 
-            # Formata inventário como lista de dicts
-            inventario = [{"nome": k, "quantidade": v} for k, v in inventario_dict.items()]
+            # Formata inventário como lista de dicts com suporte a chave composta e acabamento
+            inventario = []
+            for composite_key, qty in inventario_dict.items():
+                if "#" in composite_key:
+                    nome, acabamento = composite_key.split("#", 1)
+                else:
+                    nome, acabamento = composite_key, "normal"
+                
+                multiplicador = 1.0
+                if acabamento == "preto":
+                    multiplicador = 1.52
+                elif acabamento == "amadeirado":
+                    multiplicador = 1.44
+                
+                inventario.append({
+                    "nome": nome,
+                    "quantidade": qty,
+                    "acabamento": acabamento,
+                    "multiplicador_preco": multiplicador
+                })
 
             total_itens = sum(inventario_dict.values())
             num_tipos = len(inventario_dict)

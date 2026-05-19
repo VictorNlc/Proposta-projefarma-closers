@@ -57,6 +57,7 @@ class PrecisionAnalyzer:
         official_list = get_all_official_names()
         # -------------------------------------------------
         # 1. OCR LOCAL (Tesseract) with confidence filter
+        # 1. OCR LOCAL (Tesseract) com confidence filter
         # -------------------------------------------------
         # 1. OCR LOCAL (Tesseract) - DESABILITADO (Usando apenas OpenAI Vision)
         pass
@@ -72,7 +73,7 @@ class PrecisionAnalyzer:
                         "role": "system",
                         "content": (
                             f"Você é um especialista em inventário de mobiliário farmacêutico. "
-                            f"Sua missão é LER OS TEXTOS nas plantas baixas que representam MÓVEIS.\n"
+                            f"Sua missão é LER OS TEXTOS nas plantas baixas que representam MÓVEIS e classificar o acabamento deles baseado na cor de fundo.\n"
                             f"LISTA OFICIAL: {official_list}.\n"
                             f"IGNORAR COMPLETAMENTE: cesto de lixo, lixeira, parede, pilar, "
                             f"coluna, entrada, saída, escada, elevador, banheiro, depósito, estoque, "
@@ -104,15 +105,21 @@ class PrecisionAnalyzer:
                             f"   - **⚠️ REGRA DETERMINÍSTICA DE QUANTIDADE POR TEXTO ESCRITO:** A quantidade do 'CESTAO 400' é definida RIGOROSAMENTE pelo número de textos escritos na imagem, e nunca pelas linhas ou divisórias do desenho!\n"
                             f"     * Se o recorte contiver apenas **UM** texto escrito (ex: apenas uma palavra 'CESTÃO 400mm' ou 'RESTAG 400' na imagem), a quantidade é **1**! Mesmo que o desenho do cesto possua divisórias ou linhas internas no meio, a quantidade deve ser classificada como **1**!\n"
                             f"     * Se o recorte contiver **DOIS** textos escritos de forma separada (ex: duas etiquetas distintas de 'CESTÃO 400mm' ou 'RESTAG 400' na mesma imagem), a quantidade é **2**!\n"
-f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um expositor promocional isolado, quadrado (400x400) ou redondo. Ele **NUNCA** deve ser confundido com balcões de atendimento, caixas (checkout) ou painéis. Se você vir um desenho que mostre um balcão com o desenho de um computador/monitor/teclado em cima, ou um espaço para a cadeira do operador, isto é um **CAIXA** ou **CHECKOUT**, e **NUNCA** um Cestão! Não classifique desenhos de balcões com computadores/monitores ou caixas registradoras como 'CESTAO'!\n\n"
+                            f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um expositor promocional isolado, quadrado (400x400) ou redondo. Ele **NUNCA** deve ser confundido com balcões de atendimento, caixas (checkout) ou painéis. Se você vir um desenho que mostre um balcão com o desenho de um computador/monitor/teclado em cima, ou um espaço para a cadeira do operador, isto é um **CAIXA** ou **CHECKOUT**, e **NUNCA** um Cestão! Não classifique desenhos de balcões com computadores/monitores ou caixas registradoras como 'CESTAO'!\n\n"
+                            f"💡 REGRA DE DETECÇÃO DE ACABAMENTO (CORES DE FUNDO DA CAIXA DE TEXTO):\n"
+                            f"O acabamento de cada item deve ser classificado em 'normal', 'preto' ou 'amadeirado' dependendo EXCLUSIVAMENTE da cor de fundo (fill/background) da caixa ou bloco do texto do módulo na imagem:\n"
+                            f"   - Se o fundo/preenchimento da caixa de texto do módulo for MARROM / COR DE MADEIRA (brown/wood/wooden fill), classifique o acabamento exatamente como 'amadeirado'.\n"
+                            f"   - Se o fundo/preenchimento da caixa de texto do módulo for PRETO sólido (solid black fill), classifique o acabamento exatamente como 'preto'.\n"
+                            f"   - Se o fundo/preenchimento for BRANCO, CINZA CLARO ou qualquer cor padrão clara (white/light grey/none), classifique o acabamento como 'normal'.\n"
+                            f"NÃO decida o acabamento pelo nome do móvel, olhe estritamente as cores da imagem!\n\n"
                             f"⚠️ NUNCA retorne um JSON vazio '{{}}' se houver um móvel visível na imagem! Se vir letras (como 'PDV', 'BA', 'MED', 'PF', 'ESMALTES') e um número de medida legível ou parcialmente oculto por outros desenhos, você DEVE retornar o JSON com o item correspondente correto de acordo com as regras acima! Se o texto disser claramente 'MED' e '807mm', retorne 'MED 807' e não confunda com balcões! Se disser claramente 'MED' e '500mm', retorne 'MED 500' e não confunda com 'MED 807'! Se houver múltiplos móveis (como 'ESMALTES 500mm' E 'PF CANALETADO 807mm' na mesma imagem), retorne uma lista com TODOS eles!\n"
-                            f"Retorne JSON: {{\"achados\": [{{ \"nome\": \"TEXTO_LIDO\", \"qtd\": 1 }}]}}"
+                            f"Retorne JSON: {{\"achados\": [{{ \"nome\": \"TEXTO_LIDO\", \"qtd\": 1, \"acabamento\": \"normal\"|\"preto\"|\"amadeirado\" }}]}}"
                         )
                     },
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Quais móveis estão escritos e desenhados na imagem? Identifique e retorne TODOS os móveis presentes no recorte (ex: se houver ESMALTES e PF CANALETADO lado a lado, ou se houver dois balcões). Preste atenção extraordinária a ESMALTES, PF CANALETADO, PF, DERMO, PDV, BA, CHECKOUT, CAIXA e CESTO. CONTE CADA UM INDIVIDUALMENTE. Retorne TODOS em uma lista no JSON bruto!"},
+                            {"type": "text", "text": "Quais móveis estão escritos e desenhados na imagem? Identifique e retorne TODOS os móveis presentes no recorte (ex: se houver ESMALTES e PF CANALETADO lado a lado, ou se houver dois balcões). Preste atenção extraordinária a ESMALTES, PF CANALETADO, PF, DERMO, PDV, BA, CHECKOUT, CAIXA e CESTO. CONTE CADA UM INDIVIDUALMENTE e identifique o acabamento pela cor de fundo do texto do módulo (amadeirado se fundo marrom, preto se fundo preto, normal se fundo claro/branco). Retorne TODOS em uma lista no JSON bruto!"},
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
                         ]
                     }
@@ -127,18 +134,26 @@ f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um ex
             for found in ai_data.get("achados", []):
                 nome_ai = found.get("nome", "")
                 qty_ai = found.get("qtd", 1)
+                acabamento_ai = found.get("acabamento", "normal").lower()
+                if acabamento_ai not in ("preto", "amadeirado", "normal"):
+                    acabamento_ai = "normal"
+                
+                # Tratamento especial de compatibilidade caso o nome em si indique acabamento no texto
+                if "PRETO" in nome_ai.upper():
+                    acabamento_ai = "preto"
+                elif "AMADEIRADO" in nome_ai.upper() or "MDF" in nome_ai.upper():
+                    acabamento_ai = "amadeirado"
+
                 match = find_catalog_item(nome_ai)
                 if match:
                     if "GOND" in match:
                         qty_ai = 1
                     if match in ("CESTAO", "CESTAO 400"):
                         qty_ai = 1
-                    results.append({"item": match, "fonte": "openai", "qty": qty_ai})
-                    self._log(f"[OpenAI] Found: {match} (qty {qty_ai})")
+                    results.append({"item": match, "fonte": "openai", "qty": qty_ai, "acabamento": acabamento_ai})
+                    self._log(f"[OpenAI] Found: {match} (qty {qty_ai}) [Acabamento: {acabamento_ai}]")
         except Exception as e:
             self._log(f"⚠️ OpenAI error: {e}")
-
-
 
 
         # Guard‑rails para o CESTÃO:
@@ -181,12 +196,15 @@ f"   - **⚠️ PREVENÇÃO DE FALSO POSITIVO PARA CESTÃO:** O Cestão é um ex
         return inter_area / float(b1_area + b2_area - inter_area)
 
     def consolidate(self, all_results: List[Dict]) -> Dict:
-        """Aggregate detections from OCR and AI, summing quantities for the same item."""
+        """Aggregate detections from OCR and AI, summing quantities for the same item and finish."""
         final_inventory = Counter()
         for res in all_results:
             item = res["item"]
+            acabamento = res.get("acabamento", "normal")
             qty = res.get("qty", 1)
-            final_inventory[item] += qty
+            # Chave composta com separador #
+            composite_key = f"{item}#{acabamento}"
+            final_inventory[composite_key] += qty
         self._log(f"Consolidated inventory: {final_inventory}")
         return dict(final_inventory)
 

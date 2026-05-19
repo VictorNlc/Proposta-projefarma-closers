@@ -208,7 +208,12 @@ def analisar():
                     "recorte": i + 1,
                     "status": "OK",
                     "itens_encontrados": [
-                        {"nome": r["item"], "qty": r.get("qty", 1), "fonte": r.get("fonte", "?")}
+                        {
+                            "nome": r["item"], 
+                            "qty": r.get("qty", 1), 
+                            "fonte": r.get("fonte", "?"),
+                            "acabamento": r.get("acabamento", "normal")
+                        }
                         for r in resultados_recorte
                     ],
                     "raw_ai_data": res["raw_ai_data"],
@@ -224,10 +229,25 @@ def analisar():
                 })
         
         # Formata resposta
-        inventario_final = [
-            {"nome": nome, "quantidade": qty}
-            for nome, qty in sorted(inventario_consolidado.items())
-        ]
+        inventario_final = []
+        for composite_key, qty in sorted(inventario_consolidado.items()):
+            if "#" in composite_key:
+                nome, acabamento = composite_key.split("#", 1)
+            else:
+                nome, acabamento = composite_key, "normal"
+            
+            multiplicador = 1.0
+            if acabamento == "preto":
+                multiplicador = 1.52
+            elif acabamento == "amadeirado":
+                multiplicador = 1.44
+                
+            inventario_final.append({
+                "nome": nome,
+                "quantidade": qty,
+                "acabamento": acabamento,
+                "multiplicador_preco": multiplicador
+            })
         
         # Usa o total deduplicado (soma das quantidades no inventário consolidado)
         total = sum(item["quantidade"] for item in inventario_final)
@@ -286,7 +306,14 @@ def exportar_excel():
     # Dados
     alt_fill = PatternFill(start_color="f0f4ff", end_color="f0f4ff", fill_type="solid")
     for i, item in enumerate(inventario, start=2):
-        ws[f"A{i}"] = item["nome"]
+        nome_exibicao = item["nome"]
+        acabamento = item.get("acabamento", "normal")
+        if acabamento == "preto":
+            nome_exibicao = f"{nome_exibicao} (Preto)"
+        elif acabamento == "amadeirado":
+            nome_exibicao = f"{nome_exibicao} (Amadeirado)"
+            
+        ws[f"A{i}"] = nome_exibicao
         ws[f"B{i}"] = item["quantidade"]
         ws[f"B{i}"].alignment = Alignment(horizontal="center")
         if i % 2 == 0:
