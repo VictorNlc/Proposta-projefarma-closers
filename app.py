@@ -268,8 +268,11 @@ def analisar():
         # Itens excluídos = PDV, GOND, BA, CAIXA, CHECKOUT, MED, CESTAO, CONTROLADO, etc.
         def is_especial_lighting(nome_item: str) -> bool:
             nome_upper = nome_item.upper().strip()
+            # Força iluminação para lateral caixa (LAT CX / LATERAL CAIXA) e espaço kids
+            if "LAT CX" in nome_upper or "LATERAL CAIXA" in nome_upper or "KIDS" in nome_upper:
+                return True
             # Itens convencionais / acessórios que não levam iluminação
-            exclusoes = ["PDV", "GOND", "CAIXA", "CHECKOUT", "MED", "CESTAO", "CONTROLADO", "GANCHOS", "FECHAMENTO", "BOMB", "BASE", "MESA", "KIDS", "MACA"]
+            exclusoes = ["PDV", "GOND", "CAIXA", "CHECKOUT", "MED", "CESTAO", "CONTROLADO", "GANCHOS", "FECHAMENTO", "BOMB", "BASE", "MESA", "MACA"]
             for excl in exclusoes:
                 if excl in nome_upper:
                     return False
