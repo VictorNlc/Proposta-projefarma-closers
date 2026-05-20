@@ -160,6 +160,8 @@ class PrecisionAnalyzer:
                     if match in ("CESTAO", "CESTAO 400"):
                         qty_ai = 1
                         acabamento_ai = "normal"
+                    if "MED" in match:
+                        acabamento_ai = "normal"
                     results.append({"item": match, "fonte": "openai", "qty": qty_ai, "acabamento": acabamento_ai})
                     self._log(f"[OpenAI] Found: {match} (qty {qty_ai}) [Acabamento: {acabamento_ai}]")
         except Exception as e:
