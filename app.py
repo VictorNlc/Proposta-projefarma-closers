@@ -248,6 +248,20 @@ def analisar():
                 "acabamento": acabamento,
                 "multiplicador_preco": multiplicador
             })
+        # Garante a presença dos itens adicionais obrigatórios GANCHOS (100) e FECHAMENTO (1)
+        inventario_final = [item for item in inventario_final if item["nome"] not in ("GANCHOS", "FECHAMENTO")]
+        inventario_final.append({
+            "nome": "GANCHOS",
+            "quantidade": 100,
+            "acabamento": "normal",
+            "multiplicador_preco": 1.0
+        })
+        inventario_final.append({
+            "nome": "FECHAMENTO",
+            "quantidade": 1,
+            "acabamento": "normal",
+            "multiplicador_preco": 1.0
+        })
         
         # Usa o total deduplicado (soma das quantidades no inventário consolidado)
         total = sum(item["quantidade"] for item in inventario_final)
