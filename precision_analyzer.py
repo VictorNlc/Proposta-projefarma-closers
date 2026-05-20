@@ -170,11 +170,11 @@ class PrecisionAnalyzer:
 
 
         # Guard‑rails para o CESTÃO:
-        # 1. Se CESTÃO estiver no recorte, ignoramos qualquer detecção de CAIXA/CHECKOUT
-        #    (pois são áreas fisicamente separadas na farmácia e o CESTÃO é recortado isoladamente)
+        # 1. Se CESTÃO estiver no recorte, ignoramos absolutamente QUALQUER outro item que não seja CESTAO no mesmo recorte,
+        #    pois o CESTÃO é um expositor promocional isolado e qualquer outra detecção (como ESMALTES, PF, MED) é falso positivo.
         has_cestao = any(r["item"] in ("CESTAO", "CESTAO 400") for r in results)
         if has_cestao:
-            results = [r for r in results if r["item"] not in ("CAIXA 600", "CAIXA 1000", "CHECKOUT", "CHECKOUT L")]
+            results = [r for r in results if r["item"] in ("CESTAO", "CESTAO 400")]
 
         return results
 
