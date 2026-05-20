@@ -158,6 +158,7 @@ class PrecisionAnalyzer:
                     if "GOND" in match:
                         qty_ai = 1
                     if match in ("CESTAO", "CESTAO 400"):
+                        match = "CESTAO 400"
                         qty_ai = 1
                         acabamento_ai = "normal"
                     if "MED" in match:
