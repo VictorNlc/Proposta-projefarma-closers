@@ -249,7 +249,7 @@ def analisar():
                 "multiplicador_preco": multiplicador
             })
         # Garante a presença dos itens adicionais obrigatórios GANCHOS (100) e FECHAMENTO (1)
-        inventario_final = [item for item in inventario_final if item["nome"] not in ("GANCHOS", "FECHAMENTO")]
+        inventario_final = [item for item in inventario_final if item["nome"] not in ("GANCHOS", "FECHAMENTO", "ILUMINAÇÃO")]
         inventario_final.append({
             "nome": "GANCHOS",
             "quantidade": 100,
@@ -262,6 +262,31 @@ def analisar():
             "acabamento": "normal",
             "multiplicador_preco": 1.0
         })
+        
+        # Calcula a quantidade total de ILUMINAÇÃO necessária (1 por móvel especial)
+        # Itens especiais = PF, DERMO, ESMALTES, MAQ, MIP, LAT CX, VITRINE, CANTONEIRA, etc.
+        # Itens excluídos = PDV, GOND, BA, CAIXA, CHECKOUT, MED, CESTAO, CONTROLADO, etc.
+        def is_especial_lighting(nome_item: str) -> bool:
+            nome_upper = nome_item.upper().strip()
+            # Itens convencionais / acessórios que não levam iluminação
+            exclusoes = ["PDV", "GOND", "CAIXA", "CHECKOUT", "MED", "CESTAO", "CONTROLADO", "GANCHOS", "FECHAMENTO", "BOMB", "BASE", "MESA", "KIDS", "MACA"]
+            for excl in exclusoes:
+                if excl in nome_upper:
+                    return False
+            # BA items
+            if nome_upper == "BA" or nome_upper.startswith("BA "):
+                return False
+            return True
+
+        qtd_iluminacao = sum(item["quantidade"] for item in inventario_final if is_especial_lighting(item["nome"]))
+        
+        if qtd_iluminacao > 0:
+            inventario_final.append({
+                "nome": "ILUMINAÇÃO",
+                "quantidade": qtd_iluminacao,
+                "acabamento": "normal",
+                "multiplicador_preco": 1.0
+            })
         
         # Usa o total deduplicado (soma das quantidades no inventário consolidado)
         total = sum(item["quantidade"] for item in inventario_final)
