@@ -123,7 +123,12 @@ def detectar_recortes():
             "- y: Posição vertical do canto superior esquerdo (de 0 a 1000)\n"
             "- width: Largura horizontal da caixa (de 0 a 1000)\n"
             "- height: Altura vertical da caixa (de 0 a 1000)\n\n"
-            "⚠️ REGRAS IMPORTANTES:\n"
+            "⚠️ REGRA DE OURO DAS MARGENS E LAYOUT DA PROPOSTA (MUITO IMPORTANTE):\n"
+            "- Esta imagem é um slide de apresentação com uma margem externa bege/creme muito larga.\n"
+            "- A planta baixa real (o desenho CAD com os móveis) está contida estritamente dentro do RETÂNGULO CINZA CENTRAL da imagem (aproximadamente entre x=300 e x=700 horizontais, e y=180 e y=820 verticais).\n"
+            "- 🚫 **NÃO CRIE NENHUMA CAIXA fora deste retângulo cinza central!** As áreas bege/creme externas, o topo com os dizeres 'A Empresa Mais Indicada...', as decorações verdes nos cantos, e o rodapé com 'Projefarma' são vazios e não possuem móveis. Ignorar completamente qualquer texto fora do quadrado cinza!\n"
+            "- 🚫 **NÃO CRIE caixas com x < 300 ou x > 700!** Por exemplo, as estantes da parede esquerda da planta devem ter x em torno de 310 a 340. Jamais mapeie com x=50, 100 ou 200, pois isso cairia fora da planta nas margens vazias. A parede direita da planta termina em x=690. Jamais mapeie itens com x > 700!\n\n"
+            "⚠️ REGRAS DE DETECÇÃO:\n"
             "1. Crie uma caixa delimitadora (bounding box) justa ao redor de cada etiqueta de texto de móvel identificada (ex: caixas ao redor de 'PF 807mm', 'MED 500mm', 'CESTAO 400', 'BA 800', etc.). Se houver múltiplos móveis enfileirados onde cada um tem sua própria etiqueta, crie uma caixa separada para cada etiqueta. Se as etiquetas estiverem muito juntas, pode criar caixas individuais justas ao redor de cada uma.\n"
             "2. Não crie caixas delimitadoras para elementos estruturais como paredes, pilares, escadas, banheiros, depósitos, caixas de lixo ou nomes de áreas (ex: 'PERFUMARIA', 'RECEITA'). Apenas mapeie móveis de exposição/armazenamento farmacêutico.\n"
             "3. Lembre-se de cobrir todos os móveis visíveis na planta. Varra a imagem com atenção de cima a baixo, da esquerda para a direita.\n"
@@ -131,8 +136,8 @@ def detectar_recortes():
             "Exemplo de Retorno JSON:\n"
             "{\n"
             "  \"recortes\": [\n"
-            "    { \"x\": 150, \"y\": 220, \"width\": 80, \"height\": 35 },\n"
-            "    { \"x\": 230, \"y\": 220, \"width\": 80, \"height\": 35 }\n"
+            "    { \"x\": 320, \"y\": 220, \"width\": 40, \"height\": 15 },\n"
+            "    { \"x\": 320, \"y\": 240, \"width\": 40, \"height\": 15 }\n"
             "  ]\n"
             "}"
         )
@@ -148,7 +153,7 @@ def detectar_recortes():
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Mapeie todos os móveis e etiquetas de texto da drogaria presentes na planta baixa fornecida, retornando suas caixas delimitadoras normalizadas (0 a 1000) no formato JSON solicitado. Seja extremamente preciso nos tamanhos e posições das etiquetas de texto."},
+                        {"type": "text", "text": "Mapeie todos os móveis e etiquetas de texto da drogaria presentes na planta baixa fornecida, retornando suas caixas delimitadoras normalizadas (0 a 1000) no formato JSON solicitado. Seja extremamente preciso nos tamanhos e posições das etiquetas de texto dentro do retângulo cinza central. Ignore completamente as margens bege externamente."},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
                     ]
                 }
@@ -166,6 +171,12 @@ def detectar_recortes():
             y_norm = item.get("y", 0)
             w_norm = item.get("width", 0)
             h_norm = item.get("height", 0)
+            
+            # Filtro de segurança físico contra margens vazias do slide
+            # Se cair nas margens externas (esquerda < 280, direita > 720, topo < 150, rodapé > 850), descartamos
+            if x_norm < 280 or x_norm > 720 or y_norm < 150 or y_norm > 850:
+                analyzer._log(f"[Auto-Detection Filter] Descartado recorte fora dos limites da planta: x_norm={x_norm}, y_norm={y_norm}")
+                continue
             
             # Mapeia 0-1000 para a resolução da imagem em pixels
             x_px = int((x_norm / 1000.0) * pix.width)
