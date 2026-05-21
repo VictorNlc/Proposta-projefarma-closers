@@ -79,7 +79,7 @@ def renderizar_pdf():
 
 @app.route("/api/detectar-recortes", methods=["POST"])
 def detectar_recortes():
-    """Detecta automaticamente as caixas delimitadoras (recortes) de móveis na planta baixa extraindo as coordenadas vetoriais do PDF."""
+    """Detecta automaticamente as caixas delimitadoras (recortes) de móveis na planta baixa usando OpenAI Vision."""
     global analyzer
     if not analyzer:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -102,115 +102,98 @@ def detectar_recortes():
             
         page = doc[pagina - 1]
         
-        # Escala da imagem correspondente ao canvas (Matrix 2.0x)
+        # Renderiza a página completa em resolução ideal (2.0x) para detecção
         scale_x = scale_y = 2.0
         pix = page.get_pixmap(matrix=fitz.Matrix(scale_x, scale_y))
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         
-        # Extrai os blocos de texto nativos do PDF
-        blocks = page.get_text("blocks")
+        # Converte para base64 em JPEG
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        b64_image = base64.b64encode(buf.getvalue()).decode('utf-8')
         
+        doc.close()
+        
+        # Prompt de IA focado em mapeamento espacial das tags de móveis
+        system_instruction = (
+            "Você é um especialista em visão computacional e inventário de layouts de drogarias.\n"
+            "Sua tarefa é identificar todas as etiquetas e blocos de texto que representam módulos ou estantes de móveis nesta planta baixa CAD (por exemplo: PF, GOND, MED, CESTAO, BA, PDV, DERMO, ESMALTES, etc.).\n"
+            "Para cada etiqueta ou bloco de texto que você encontrar, forneça a caixa delimitadora (bounding box) contendo as coordenadas normalizadas de 0 a 1000, onde:\n"
+            "- x: Posição horizontal do canto superior esquerdo (de 0 a 1000)\n"
+            "- y: Posição vertical do canto superior esquerdo (de 0 a 1000)\n"
+            "- width: Largura horizontal da caixa (de 0 a 1000)\n"
+            "- height: Altura vertical da caixa (de 0 a 1000)\n\n"
+            "⚠️ REGRA DE OURO DAS MARGENS E LAYOUT DA PROPOSTA (MUITO IMPORTANTE):\n"
+            "- Esta imagem é um slide de apresentação com uma margem externa bege/creme muito larga.\n"
+            "- A planta baixa real (o desenho CAD com os móveis) está contida estritamente dentro do RETÂNGULO CINZA CENTRAL da imagem (aproximadamente entre x=300 e x=700 horizontais, e y=180 e y=820 verticais).\n"
+            "- 🚫 **NÃO CRIE NENHUMA CAIXA fora deste retângulo cinza central!** As áreas bege/creme externas, o topo com os dizeres 'A Empresa Mais Indicada...', as decorações verdes nos cantos, e o rodapé com 'Projefarma' são vazios e não possuem móveis. Ignorar completamente qualquer texto fora do quadrado cinza!\n"
+            "- 🚫 **NÃO CRIE caixas com x < 300 ou x > 700!** Por exemplo, as estantes da parede esquerda da planta devem ter x em torno de 310 a 340. Jamais mapeie com x=50, 100 ou 200, pois isso cairia fora da planta nas margens vazias. A parede direita da planta termina em x=690. Jamais mapeie itens com x > 700!\n\n"
+            "⚠️ REGRAS DE DETECÇÃO:\n"
+            "1. Crie uma caixa delimitadora (bounding box) justa ao redor de cada etiqueta de texto de móvel identificada (ex: caixas ao redor de 'PF 807mm', 'MED 500mm', 'CESTAO 400', 'BA 800', etc.). Se houver múltiplos móveis enfileirados onde cada um tem sua própria etiqueta, crie uma caixa separada para cada etiqueta. Se as etiquetas estiverem muito juntas, pode criar caixas individuais justas ao redor de cada uma.\n"
+            "2. Não crie caixas delimitadoras para elementos estruturais como paredes, pilares, escadas, banheiros, depósitos, caixas de lixo ou nomes de áreas (ex: 'PERFUMARIA', 'RECEITA'). Apenas mapeie móveis de exposição/armazenamento farmacêutico.\n"
+            "3. Lembre-se de cobrir todos os móveis visíveis na planta. Varra a imagem com atenção de cima a baixo, da esquerda para a direita.\n"
+            "4. Retorne a resposta estritamente em formato JSON com uma lista sob a chave 'recortes'.\n\n"
+            "Exemplo de Retorno JSON:\n"
+            "{\n"
+            "  \"recortes\": [\n"
+            "    { \"x\": 320, \"y\": 220, \"width\": 40, \"height\": 15 },\n"
+            "    { \"x\": 320, \"y\": 240, \"width\": 40, \"height\": 15 }\n"
+            "  ]\n"
+            "}"
+        )
+        
+        # Envia para o OpenAI Vision
+        response = analyzer.client.chat.completions.create(
+            model=analyzer.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_instruction
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Mapeie todos os móveis e etiquetas de texto da drogaria presentes na planta baixa fornecida, retornando suas caixas delimitadoras normalizadas (0 a 1000) no formato JSON solicitado. Seja extremamente preciso nos tamanhos e posições das etiquetas de texto dentro do retângulo cinza central. Ignore completamente as margens bege externamente."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
+                    ]
+                }
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        content = response.choices[0].message.content
+        data = json.loads(content)
+        
+        # Converte as coordenadas normalizadas de volta para pixels absolutos
         recortes_detectados = []
-        padding = 4  # padding em pontos PDF (cerca de 8px em escala 2x) para garantir leitura de OCR sem bordas cortadas
-        
-        def normalize_str(text):
-            if not text:
-                return ""
-            return text.upper().strip().replace("Á", "A").replace("É", "E").replace("Ó", "O").replace("Ã", "A").replace("Õ", "O")
+        for item in data.get("recortes", []):
+            x_norm = item.get("x", 0)
+            y_norm = item.get("y", 0)
+            w_norm = item.get("width", 0)
+            h_norm = item.get("height", 0)
             
-        # Termos excluídos (ruídos que não representam móveis a serem listados)
-        excluded_terms = {
-            "LIXO", "LIXEIRA", "PAREDE", "PILAR", "COLUNA", "ENTRADA",
-            "SAIDA", "ESCADA", "ELEVADOR", "BANHEIRO", "WC", "DEPOSITO",
-            "ESTOQUE", "COPA", "CORREDOR", "HALL", "RECEPCAO",
-            "AREA", "SETOR", "ZONA", "SALA", "PERFUMARIA", "RECEITA", "GERENTE"
-        }
-        
-        # Termos e códigos de móveis Projefarma a serem detectados
-        furniture_words = {
-            "PF", "MED", "GOND", "BA", "PDV", "CESTAO", "CESTÃO", "ESMALTES", "ESMALTE",
-            "DERMO", "CHECKOUT", "MAQ", "MIP", "VITRINE", "BOMB", "RESTAG", "CAIXA", 
-            "CONTROLADO", "MIP'S", "MIPS", "BOMBONIERE", "DESTAQUE", "GESTAO", "GESTÃO",
-            "REST", "RESTÃO", "RESTAO", "ESTANTE", "BASE", "MESA", "MACA", "LAT", "CX", 
-            "LATERAL", "POMBAL", "PIA", "VIDRO", "VD", "CTRL", "CANALETADO", "CANAL", 
-            "PAINEL", "PRATELEIRA", "KIDS", "ESPACO", "ESPAÇO"
-        }
-        
-        for b in blocks:
-            x0, y0, x1, y1, block_text, block_no, block_type = b
-            
-            # Apenas blocos de texto (block_type == 0)
-            if block_type != 0:
-                continue
-                
-            block_text_norm = normalize_str(block_text)
-            if not block_text_norm:
-                continue
-                
-            # Verifica se contém algum termo excluído
-            has_excluded = False
-            for excl in excluded_terms:
-                if excl in block_text_norm:
-                    has_excluded = True
-                    break
-            if has_excluded:
-                continue
-                
-            # Verifica se contém alguma palavra-chave de móvel ou se algum token começa com código numérico (ex: PF807, MED500)
-            tokens = [t.strip(" ,.-():/\\\n\r\t") for t in block_text_norm.split()]
-            is_furniture = False
-            for token in tokens:
-                if token in furniture_words:
-                    is_furniture = True
-                    break
-                for pref in {"PF", "MED", "GOND", "BA", "PDV", "MAQ", "MIP", "BOMB", "CESTAO"}:
-                    if token.startswith(pref) and len(token) > len(pref) and token[len(pref)].isdigit():
-                        is_furniture = True
-                        break
-                if is_furniture:
-                    break
-                    
-            if not is_furniture:
-                continue
-                
-            # Aplica padding ao redor das coordenadas do bloco
-            x0_padded = max(0, x0 - padding)
-            y0_padded = max(0, y0 - padding)
-            x1_padded = min(page.rect.width, x1 + padding)
-            y1_padded = min(page.rect.height, y1 + padding)
-            
-            # Converte coordenadas vetoriais do PDF para pixels absolutos (escala 2.0x)
-            x_px = int(x0_padded * scale_x)
-            y_px = int(y0_padded * scale_y)
-            w_px = int((x1_padded - x0_padded) * scale_x)
-            h_px = int((y1_padded - y0_padded) * scale_y)
-            
-            # Filtro físico contra as margens vazias bege do slide da Proposta
-            # Converte para escala normalizada de 0-1000
-            x_norm = int((x_px / pix.width) * 1000)
-            y_norm = int((y_px / pix.height) * 1000)
-            
+            # Filtro de segurança físico contra margens vazias do slide
+            # Se cair nas margens externas (esquerda < 280, direita > 720, topo < 150, rodapé > 850), descartamos
             if x_norm < 280 or x_norm > 720 or y_norm < 150 or y_norm > 850:
+                analyzer._log(f"[Auto-Detection Filter] Descartado recorte fora dos limites da planta: x_norm={x_norm}, y_norm={y_norm}")
                 continue
-                
-            # Evita ruídos ou blocos de texto muito minúsculos
-            if w_px > 5 and h_px > 5:
-                # Se a altura for significativamente maior que a largura, o texto está rotacionado (vertical)
-                # Fornecemos por padrão a rotação de 90° para que a imagem recortada e enviada para o GPT-4o fique na horizontal
-                rotacao = 0
-                if h_px > w_px * 1.1:
-                    rotacao = 90
-                    
+            
+            # Mapeia 0-1000 para a resolução da imagem em pixels
+            x_px = int((x_norm / 1000.0) * pix.width)
+            y_px = int((y_norm / 1000.0) * pix.height)
+            w_px = int((w_norm / 1000.0) * pix.width)
+            h_px = int((h_norm / 1000.0) * pix.height)
+            
+            # Evita ruídos ou recortes extremamente pequenos
+            if w_px > 8 and h_px > 8:
                 recortes_detectados.append({
                     "x": x_px,
                     "y": y_px,
                     "width": w_px,
-                    "height": h_px,
-                    "rotacao": rotacao
+                    "height": h_px
                 })
                 
-        doc.close()
-        
-        analyzer._log(f"[Vector Auto-Detection] Mapeados com sucesso {len(recortes_detectados)} móveis na planta do PDF.")
+        analyzer._log(f"[Auto-Detection] Encontrados {len(recortes_detectados)} recortes na planta baixa.")
         return jsonify({
             "status": "success",
             "recortes": recortes_detectados
