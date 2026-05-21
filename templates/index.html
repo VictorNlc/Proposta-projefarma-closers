@@ -541,17 +541,33 @@
             );
             
             if (sobRecorte) {
-                arrastando = sobRecorte;
+                // Select the recorte (click-to-select)
                 selecionadoId = sobRecorte.id;
-                offsetArrastarX = pos.x - sobRecorte.x;
-                offsetArrastarY = pos.y - sobRecorte.y;
-                canvas.style.cursor = 'move';
+                if (e.shiftKey) {
+                    // Move mode when Shift is held
+                    arrastando = sobRecorte;
+                    offsetArrastarX = pos.x - sobRecorte.x;
+                    offsetArrastarY = pos.y - sobRecorte.y;
+                    canvas.style.cursor = 'move';
+                } else {
+                    // Just select without moving
+                    canvas.style.cursor = 'pointer';
+                }
             } else {
-                desenhando = true;
-                selecionadoId = null;
-                startImgX = pos.x;
-                startImgY = pos.y;
-                currentRect = null;
+                // Cria recorte automático com tamanho padrão
+                const size = 100; // pixels
+                idCounter++;
+                const newRecorte = {
+                    id: idCounter,
+                    x: pos.x - size / 2,
+                    y: pos.y - size / 2,
+                    width: size,
+                    height: size,
+                    rotacao: document.getElementById('chk-rotacionar').checked ? 180 : 0
+                };
+                recortes.push(newRecorte);
+                selecionadoId = newRecorte.id;
+                atualizarLista();
             }
             
             redraw();
