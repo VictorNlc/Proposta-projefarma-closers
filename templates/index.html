@@ -352,9 +352,14 @@
                         Nenhum recorte ainda
                     </p>
                 </div>
-                <button class="btn btn-primary" onclick="analisar()" id="btn-analisar" style="margin-top: 12px;" disabled>
-                    🔍 Analisar
-                </button>
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
+                    <button class="btn btn-primary" onclick="analisar()" id="btn-analisar" style="flex: 1;" disabled>
+                        🔍 Analisar
+                    </button>
+                    <button class="btn" onclick="detectarRecortesAuto()" id="btn-detectar-auto" style="flex: 1; background: linear-gradient(135deg, #7b61ff, #00d4ff); color: #fff;" disabled>
+                        🪄 Detectar IA
+                    </button>
+                </div>
             </div>
             
             <div class="card">
@@ -492,6 +497,7 @@
                     offsetX = (wrapW - img.width * scale) / 2;
                     offsetY = (wrapH - img.height * scale) / 2;
                     redraw();
+                    document.getElementById('btn-detectar-auto').disabled = false;
                 };
                 img.src = 'data:image/png;base64,' + data.imagem;
             } catch (e) {
@@ -623,8 +629,8 @@
             
             ctx.drawImage(pdfImageData, 0, 0);
             
-            // Desenha recortes
-            for (const r of recortes) {
+            // Desenha recortes com números identificadores
+            recortes.forEach((r, idx) => {
                 const isSelected = r.id === selecionadoId;
                 ctx.strokeStyle = isSelected ? '#7b61ff' : '#00d4ff';
                 ctx.lineWidth = isSelected ? 3 : 2;
@@ -634,7 +640,30 @@
                     ctx.fillStyle = 'rgba(123, 97, 255, 0.1)';
                     ctx.fillRect(r.x, r.y, r.width, r.height);
                 }
-            }
+
+                // Desenha número identificador (badge) no canto superior esquerdo do recorte
+                ctx.save();
+                const fontSize = Math.max(10, Math.min(18, Math.round(13 / scale))); // Adapta tamanho do texto ao zoom
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                const text = `${idx + 1}`;
+                const textWidth = ctx.measureText(text).width;
+                
+                const badgeH = fontSize + 6;
+                const badgeW = Math.max(badgeH, textWidth + 10);
+                const badgeX = r.x;
+                const badgeY = r.y - badgeH >= 0 ? r.y - badgeH : r.y; // Evita sair da borda superior da imagem
+                
+                // Fundo do badge
+                ctx.fillStyle = isSelected ? '#7b61ff' : '#00d4ff';
+                ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+                
+                // Texto do badge (número branco)
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, badgeX + badgeW/2, badgeY + badgeH/2);
+                ctx.restore();
+            });
             
             // Desenha recorte em progresso
             if (currentRect) {
@@ -690,6 +719,70 @@
             recortes = recortes.filter(r => r.id !== id);
             atualizarLista();
             redraw();
+        }
+
+        async function detectarRecortesAuto() {
+            const file = document.getElementById('inp-pdf').files[0];
+            if (!file) {
+                alert('Selecione um arquivo PDF primeiro.');
+                return;
+            }
+            
+            const pagina = document.getElementById('inp-pagina').value;
+            const spinner = document.getElementById('spinner');
+            const btnAnalisar = document.getElementById('btn-analisar');
+            const btnDetectar = document.getElementById('btn-detectar-auto');
+            
+            spinner.textContent = '⏳ Mapeando móveis com IA...';
+            spinner.classList.add('show');
+            btnDetectar.disabled = true;
+            btnAnalisar.disabled = true;
+            
+            const fd = new FormData();
+            fd.append('pdf', file);
+            fd.append('pagina', pagina);
+            
+            try {
+                const r = await fetch('/api/detectar-recortes', { method: 'POST', body: fd });
+                const data = await r.json();
+                
+                if (data.erro) {
+                    alert('Erro na detecção automática: ' + data.erro);
+                    return;
+                }
+                
+                if (data.recortes && data.recortes.length > 0) {
+                    recortes = [];
+                    idCounter = 0;
+                    
+                    const baseRot = document.getElementById('chk-rotacionar').checked ? 180 : 0;
+                    
+                    data.recortes.forEach(rect => {
+                        idCounter++;
+                        recortes.push({
+                            id: idCounter,
+                            x: rect.x,
+                            y: rect.y,
+                            width: rect.width,
+                            height: rect.height,
+                            rotacao: baseRot
+                        });
+                    });
+                    
+                    atualizarLista();
+                    redraw();
+                    alert(`IA encontrou e marcou ${data.recortes.length} caixas de móveis na planta!`);
+                } else {
+                    alert('Nenhum móvel foi detectado automaticamente na planta.');
+                }
+            } catch (e) {
+                alert('Erro ao chamar detecção de recortes: ' + e.message);
+            } finally {
+                spinner.classList.remove('show');
+                spinner.textContent = '⏳ Analisando... aguarde';
+                btnDetectar.disabled = false;
+                btnAnalisar.disabled = false;
+            }
         }
         
         async function analisar() {

@@ -77,6 +77,122 @@ def renderizar_pdf():
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
+@app.route("/api/detectar-recortes", methods=["POST"])
+def detectar_recortes():
+    """Detecta automaticamente as caixas delimitadoras (recortes) de móveis na planta baixa usando OpenAI Vision."""
+    global analyzer
+    if not analyzer:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return jsonify({"erro": "A chave OPENAI_API_KEY não está configurada no servidor. Por favor, adicione-a nas variáveis de ambiente do Render."}), 500
+        analyzer = PrecisionAnalyzer(api_key)
+        
+    pdf_file = request.files.get("pdf")
+    pagina = int(request.form.get("pagina", 1))
+    
+    if not pdf_file:
+        return jsonify({"erro": "Nenhum PDF enviado"}), 400
+        
+    try:
+        pdf_bytes = pdf_file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        
+        if pagina < 1 or pagina > len(doc):
+            return jsonify({"erro": f"Página {pagina} inválida"}), 400
+            
+        page = doc[pagina - 1]
+        
+        # Renderiza a página completa em resolução ideal (2.0x) para detecção
+        scale_x = scale_y = 2.0
+        pix = page.get_pixmap(matrix=fitz.Matrix(scale_x, scale_y))
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        
+        # Converte para base64 em JPEG
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        b64_image = base64.b64encode(buf.getvalue()).decode('utf-8')
+        
+        doc.close()
+        
+        # Prompt de IA focado em mapeamento espacial das tags de móveis
+        system_instruction = (
+            "Você é um especialista em visão computacional e inventário de layouts de drogarias.\n"
+            "Sua tarefa é identificar todas as etiquetas e blocos de texto que representam módulos ou estantes de móveis nesta planta baixa CAD (por exemplo: PF, GOND, MED, CESTAO, BA, PDV, DERMO, ESMALTES, etc.).\n"
+            "Para cada etiqueta ou bloco de texto que você encontrar, forneça a caixa delimitadora (bounding box) contendo as coordenadas normalizadas de 0 a 1000, onde:\n"
+            "- x: Posição horizontal do canto superior esquerdo (de 0 a 1000)\n"
+            "- y: Posição vertical do canto superior esquerdo (de 0 a 1000)\n"
+            "- width: Largura horizontal da caixa (de 0 a 1000)\n"
+            "- height: Altura vertical da caixa (de 0 a 1000)\n\n"
+            "⚠️ REGRAS IMPORTANTES:\n"
+            "1. Crie uma caixa delimitadora (bounding box) justa ao redor de cada etiqueta de texto de móvel identificada (ex: caixas ao redor de 'PF 807mm', 'MED 500mm', 'CESTAO 400', 'BA 800', etc.). Se houver múltiplos móveis enfileirados onde cada um tem sua própria etiqueta, crie uma caixa separada para cada etiqueta. Se as etiquetas estiverem muito juntas, pode criar caixas individuais justas ao redor de cada uma.\n"
+            "2. Não crie caixas delimitadoras para elementos estruturais como paredes, pilares, escadas, banheiros, depósitos, caixas de lixo ou nomes de áreas (ex: 'PERFUMARIA', 'RECEITA'). Apenas mapeie móveis de exposição/armazenamento farmacêutico.\n"
+            "3. Lembre-se de cobrir todos os móveis visíveis na planta. Varra a imagem com atenção de cima a baixo, da esquerda para a direita.\n"
+            "4. Retorne a resposta estritamente em formato JSON com uma lista sob a chave 'recortes'.\n\n"
+            "Exemplo de Retorno JSON:\n"
+            "{\n"
+            "  \"recortes\": [\n"
+            "    { \"x\": 150, \"y\": 220, \"width\": 80, \"height\": 35 },\n"
+            "    { \"x\": 230, \"y\": 220, \"width\": 80, \"height\": 35 }\n"
+            "  ]\n"
+            "}"
+        )
+        
+        # Envia para o OpenAI Vision
+        response = analyzer.client.chat.completions.create(
+            model=analyzer.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_instruction
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Mapeie todos os móveis e etiquetas de texto da drogaria presentes na planta baixa fornecida, retornando suas caixas delimitadoras normalizadas (0 a 1000) no formato JSON solicitado. Seja extremamente preciso nos tamanhos e posições das etiquetas de texto."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}}
+                    ]
+                }
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        content = response.choices[0].message.content
+        data = json.loads(content)
+        
+        # Converte as coordenadas normalizadas de volta para pixels absolutos
+        recortes_detectados = []
+        for item in data.get("recortes", []):
+            x_norm = item.get("x", 0)
+            y_norm = item.get("y", 0)
+            w_norm = item.get("width", 0)
+            h_norm = item.get("height", 0)
+            
+            # Mapeia 0-1000 para a resolução da imagem em pixels
+            x_px = int((x_norm / 1000.0) * pix.width)
+            y_px = int((y_norm / 1000.0) * pix.height)
+            w_px = int((w_norm / 1000.0) * pix.width)
+            h_px = int((h_norm / 1000.0) * pix.height)
+            
+            # Evita ruídos ou recortes extremamente pequenos
+            if w_px > 8 and h_px > 8:
+                recortes_detectados.append({
+                    "x": x_px,
+                    "y": y_px,
+                    "width": w_px,
+                    "height": h_px
+                })
+                
+        analyzer._log(f"[Auto-Detection] Encontrados {len(recortes_detectados)} recortes na planta baixa.")
+        return jsonify({
+            "status": "success",
+            "recortes": recortes_detectados
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+
 @app.route("/api/analisar", methods=["POST"])
 def analisar():
     """Analisa recortes com 100% de precisão."""
