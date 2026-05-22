@@ -62,9 +62,9 @@ def renderizar_pdf():
         pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         
-        # Converte para base64
+        # Converte para base64 com compressão JPEG para carregamento instantâneo
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        img.save(buf, format="JPEG", quality=75)
         b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         
         return jsonify({
